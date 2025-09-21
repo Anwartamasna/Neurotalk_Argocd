@@ -1,0 +1,193 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neurotalk-api-deployment
+  namespace: neurotalk
+  labels:
+    app: neurotalk-api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: neurotalk-api
+  template:
+    metadata:
+      labels:
+        app: neurotalk-api
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      terminationGracePeriodSeconds: 300
+      containers:
+        - name: neurotalk-api
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:14
+          imagePullPolicy: IfNotPresent
+          command: ["uv"]
+          args:
+            - "run"
+            - "uvicorn"
+            - "app.main:app"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8000"
+            - "--forwarded-allow-ips"
+            - "*"
+            - "--proxy-headers"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          env:
+            - name: ENV
+              value: "k8s"
+            - name: CONFIG_PATH
+              value: "/app/config/k8s.yaml"
+
+            # Database secrets
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DATABASE_URL_POOLED
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+
+            # Redis secrets
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: REDIS_URL
+
+            # MinIO secrets
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_SECRET_KEY
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_ENDPOINT
+            - name: MINIO_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_BUCKET
+            - name: MINIO_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: MINIO_REGION
+
+            # Backend secrets
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: JWT_SECRET_KEY
+            - name: SMTP_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: SMTP_SERVER
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: SMTP_PORT
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: SMTP_PASSWORD
+            - name: SMTP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: SMTP_USERNAME
+            - name: FROM_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: FROM_EMAIL
+            - name: SUPPORT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: SUPPORT_EMAIL
+
+            # AI secrets
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-credentials
+                  key: GEMINI_API_KEY
+            - name: OLLAMA_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ai-credentials
+                  key: OLLAMA_BASE_URL
+
+          volumeMounts:
+            - name: backend-config
+              mountPath: /app/config
+              readOnly: true
+      volumes:
+        - name: backend-config
+          configMap:
+            name: backend-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neurotalk-api-service
+  namespace: neurotalk
+spec:
+  selector:
+    app: neurotalk-api
+  ports:
+    - port: 80
+      name: http
+      targetPort: 8000
+    - port: 443
+      name: https
+      targetPort: 8000
+  type: LoadBalancer

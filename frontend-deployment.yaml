@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neurotalk-frontend
+  namespace: neurotalk
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: neurotalk-frontend
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: neurotalk-frontend
+        tier: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: harbor.imadzajli.xyz/neurotalk-front/neurotalk-frontend:13
+        ports:
+        - containerPort: 80
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: API_URL
+          value: "/api"
+        volumeMounts:
+        - name: frontend-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: nginx.conf
+        - name: frontend-config
+          mountPath: /usr/share/nginx/html/config.js
+          subPath: app.config.js
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: frontend-config
+        configMap:
+          name: frontend-config

@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neurotalk-email-worker
+  namespace: neurotalk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neurotalk-email-worker
+      tier: backend
+      component: email-worker
+  template:
+    metadata:
+      labels:
+        app: neurotalk-email-worker
+        tier: backend
+        component: email-worker
+    spec:
+      containers:
+      - name: email-worker
+        image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:14
+        env:
+        - name: ENV
+          value: "k8s"
+        # Redis secrets
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: REDIS_URL
+        # Email secrets
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: backend-credentials
+              key: SMTP_PASSWORD
+        - name: SMTP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: backend-credentials
+              key: SMTP_USERNAME
+        command: ["uv", "run", "celery", "-A", "app.celery_app", "worker", "-E", "--loglevel=info", "--concurrency=2", "--queues=email_polling", "--max-tasks-per-child=50", "--prefetch-multiplier=1"]
+        volumeMounts:
+        - name: backend-config
+          mountPath: /app/config
+          readOnly: true
+        livenessProbe:
+          exec:
+            command:
+            - uv
+            - run
+            - celery
+            - -A
+            - app.celery_app
+            - inspect
+            - ping
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: backend-config
+        configMap:
+          name: backend-config
