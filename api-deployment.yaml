@@ -174,7 +174,3 @@ spec:
           configMap:
             name: backend-config
 
-    - port: 443
-      name: https
-      targetPort: 8000
-  type: LoadBalancer
