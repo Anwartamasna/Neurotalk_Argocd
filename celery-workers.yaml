@@ -126,17 +126,3 @@ spec:
         - name: backend-config
           configMap:
             name: backend-config
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: neurotalk-celery-autoscaler
-  namespace: neurotalk
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: neurotalk-celery-worker
-  minReplicas: 1
-  maxReplicas: 4
-  targetCPUUtilizationPercentage: 50
