@@ -174,3 +174,22 @@ spec:
           configMap:
             name: backend-config
 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neurotalk-api-service
+  namespace: neurotalk
+spec:
+  selector:
+    app: neurotalk-api
+  ports:
+    - port: 80
+      name: http
+      targetPort: 8000
+    - port: 443
+      name: https
+      targetPort: 8000
+  type: LoadBalancer
+
+
