@@ -43,8 +43,6 @@ spec:
               value: "k8s"
             - name: UV_CACHE_DIR
               value: "/var/cache/uv"
-
-            # broker/backend + app config (matches your current worker)
             - name: DATABASE_NAME
               valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_name } }
             - name: DATABASE_USER
@@ -65,7 +63,6 @@ spec:
               valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_result_url } }
             - name: CHANNELS_URLS
               valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: channels_url } }
-
           resources:
             requests:
               cpu: "300m"
@@ -73,14 +70,12 @@ spec:
             limits:
               cpu: "1500m"
               memory: "4Gi"
-
           volumeMounts:
             - name: uv-cache
               mountPath: /var/cache/uv
             - name: backend-config
               mountPath: /app/config
               readOnly: true
-
           livenessProbe:
             exec:
               command: ["uv","run","celery","-A","app.celery_app","inspect","ping"]
@@ -88,7 +83,6 @@ spec:
             periodSeconds: 60
             timeoutSeconds: 30
             failureThreshold: 3
-
       volumes:
         - name: uv-cache
           emptyDir: {}
@@ -99,19 +93,19 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: neurotalk-email-worker
+  name: neurotalk-payment-worker
   namespace: neurotalk
   labels:
-    app: neurotalk-email-worker
+    app: neurotalk-payment-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: neurotalk-email-worker
+      app: neurotalk-payment-worker
   template:
     metadata:
       labels:
-        app: neurotalk-email-worker
+        app: neurotalk-payment-worker
     spec:
       terminationGracePeriodSeconds: 60
       securityContext:
@@ -119,39 +113,43 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - name: email-worker
+        - name: payment-worker
           image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:28
           imagePullPolicy: IfNotPresent
           command: ["uv"]
           args:
             [
               "run","celery","-A","app.celery_app","worker",
-              "-E",
               "--loglevel=INFO",
-              "--queues=email_polling",
-              "--concurrency=2",
-              "--max-tasks-per-child=50",
+              "--queues=payment_processing",
               "--prefetch-multiplier=1",
-              "--hostname=%h.email"
+              "--hostname=%h.payment"
             ]
           env:
             - name: ENV
               value: "k8s"
             - name: UV_CACHE_DIR
               value: "/var/cache/uv"
-
-            # You previously used these for email worker; keep them if needed
-            - name: SMTP_PASSWORD
-              valueFrom: { secretKeyRef: { name: backend-credentials, key: SMTP_PASSWORD } }
-            - name: SMTP_USERNAME
-              valueFrom: { secretKeyRef: { name: backend-credentials, key: SMTP_USERNAME } }
-
-            # Redis / broker config – if your app reads these or uses settings.redis.url
+            - name: DATABASE_NAME
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_name } }
+            - name: DATABASE_USER
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_user } }
+            - name: DATABASE_PASSWORD
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_password } }
+            - name: DATABASE_HOST
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_host } }
+            - name: DATABASE_PORT
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_port } }
+            - name: ALLOWED_HOST
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: allowed_host } }
+            - name: CORS_ALLOWED_ORIGINS
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: cors_allowed_origins } }
             - name: CELERY_BROKER_URL
               valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_broker_url } }
             - name: CELERY_RESULT_URL
               valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_result_url } }
-
+            - name: CHANNELS_URLS
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: channels_url } }
           resources:
             requests:
               cpu: "100m"
@@ -159,14 +157,12 @@ spec:
             limits:
               cpu: "500m"
               memory: "1Gi"
-
           volumeMounts:
             - name: uv-cache
               mountPath: /var/cache/uv
             - name: backend-config
               mountPath: /app/config
               readOnly: true
-
           livenessProbe:
             exec:
               command: ["uv","run","celery","-A","app.celery_app","inspect","ping"]
@@ -174,7 +170,6 @@ spec:
             periodSeconds: 60
             timeoutSeconds: 30
             failureThreshold: 3
-
       volumes:
         - name: uv-cache
           emptyDir: {}
