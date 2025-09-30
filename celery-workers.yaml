@@ -27,7 +27,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: neurotalk-celery-worker
-          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:27
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:28
           imagePullPolicy: IfNotPresent
           command: ["uv"]
           args: ["run", "celery", "-A", "app.celery_app", "worker", "--loglevel=INFO"]
