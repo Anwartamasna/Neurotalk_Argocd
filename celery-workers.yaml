@@ -152,11 +152,11 @@ spec:
               valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: channels_url } }
           resources:
             requests:
-              cpu: "100m"
-              memory: "512Mi"
+              cpu: "300m"
+              memory: "2Gi"
             limits:
-              cpu: "500m"
-              memory: "1Gi"
+              cpu: "1000m"
+              memory: "3Gi"
           volumeMounts:
             - name: uv-cache
               mountPath: /var/cache/uv
