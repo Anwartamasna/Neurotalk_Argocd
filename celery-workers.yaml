@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: neurotalk-celery-worker
+  name: neurotalk-ai-worker
   namespace: neurotalk
   labels:
-    app: neurotalk-celery-worker
+    app: neurotalk-ai-worker
 spec:
   replicas: 3
   strategy:
@@ -14,112 +14,167 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: neurotalk-celery-worker
+      app: neurotalk-ai-worker
   template:
     metadata:
       labels:
-        app: neurotalk-celery-worker
+        app: neurotalk-ai-worker
     spec:
-      terminationGracePeriodSeconds: 86400
+      terminationGracePeriodSeconds: 60
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-        - name: neurotalk-celery-worker
-          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:29
+        - name: ai-worker
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:28
           imagePullPolicy: IfNotPresent
           command: ["uv"]
-          args: ["run", "celery", "-A", "app.celery_app", "worker", "--loglevel=INFO"]
-          volumeMounts:
-            - name: backend-config
-              mountPath: /app/config
-              readOnly: true
+          args:
+            [
+              "run","celery","-A","app.celery_app","worker",
+              "--loglevel=INFO",
+              "--queues=ai_processing",
+              "--prefetch-multiplier=1",
+              "--hostname=%h.ai"
+            ]
           env:
-            # Fix uv cache permission issue
             - name: ENV
               value: "k8s"
             - name: UV_CACHE_DIR
               value: "/var/cache/uv"
-            # --- Secrets from your existing neurotalk-secrets ---
+
+            # broker/backend + app config (matches your current worker)
             - name: DATABASE_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: database_name
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_name } }
             - name: DATABASE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: database_user
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_user } }
             - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: database_password
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_password } }
             - name: DATABASE_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: database_host
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_host } }
             - name: DATABASE_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: database_port
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: database_port } }
             - name: ALLOWED_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: allowed_host
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: allowed_host } }
             - name: CORS_ALLOWED_ORIGINS
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: cors_allowed_origins
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: cors_allowed_origins } }
             - name: CELERY_BROKER_URL
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: celery_broker_url
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_broker_url } }
             - name: CELERY_RESULT_URL
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: celery_result_url
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_result_url } }
             - name: CHANNELS_URLS
-              valueFrom:
-                secretKeyRef:
-                  name: neurotalk-secrets
-                  key: channels_url
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: channels_url } }
+
           resources:
             requests:
-              cpu: "100m"
+              cpu: "300m"
               memory: "2Gi"
             limits:
-              cpu: "500m"
-              memory: "3Gi"
+              cpu: "1500m"
+              memory: "4Gi"
+
           volumeMounts:
             - name: uv-cache
               mountPath: /var/cache/uv
             - name: backend-config
               mountPath: /app/config
               readOnly: true
+
           livenessProbe:
             exec:
-                command:
-                    - uv
-                    - run
-                    - celery
-                    - -A
-                    - app.celery_app
-                    - inspect
-                    - ping
+              command: ["uv","run","celery","-A","app.celery_app","inspect","ping"]
             initialDelaySeconds: 60
             periodSeconds: 60
             timeoutSeconds: 30
             failureThreshold: 3
-          
+
+      volumes:
+        - name: uv-cache
+          emptyDir: {}
+        - name: backend-config
+          configMap:
+            name: backend-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neurotalk-email-worker
+  namespace: neurotalk
+  labels:
+    app: neurotalk-email-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neurotalk-email-worker
+  template:
+    metadata:
+      labels:
+        app: neurotalk-email-worker
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: email-worker
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:28
+          imagePullPolicy: IfNotPresent
+          command: ["uv"]
+          args:
+            [
+              "run","celery","-A","app.celery_app","worker",
+              "-E",
+              "--loglevel=INFO",
+              "--queues=email_polling",
+              "--concurrency=2",
+              "--max-tasks-per-child=50",
+              "--prefetch-multiplier=1",
+              "--hostname=%h.email"
+            ]
+          env:
+            - name: ENV
+              value: "k8s"
+            - name: UV_CACHE_DIR
+              value: "/var/cache/uv"
+
+            # You previously used these for email worker; keep them if needed
+            - name: SMTP_PASSWORD
+              valueFrom: { secretKeyRef: { name: backend-credentials, key: SMTP_PASSWORD } }
+            - name: SMTP_USERNAME
+              valueFrom: { secretKeyRef: { name: backend-credentials, key: SMTP_USERNAME } }
+
+            # Redis / broker config – if your app reads these or uses settings.redis.url
+            - name: CELERY_BROKER_URL
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_broker_url } }
+            - name: CELERY_RESULT_URL
+              valueFrom: { secretKeyRef: { name: neurotalk-secrets, key: celery_result_url } }
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+
+          volumeMounts:
+            - name: uv-cache
+              mountPath: /var/cache/uv
+            - name: backend-config
+              mountPath: /app/config
+              readOnly: true
+
+          livenessProbe:
+            exec:
+              command: ["uv","run","celery","-A","app.celery_app","inspect","ping"]
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 30
+            failureThreshold: 3
+
       volumes:
         - name: uv-cache
           emptyDir: {}
