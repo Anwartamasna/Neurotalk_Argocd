@@ -27,7 +27,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: ai-worker
-          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:84
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:85
           imagePullPolicy: IfNotPresent
           command: ["uv"]
           args:
@@ -114,7 +114,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: payment-worker
-          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:84
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:85
           imagePullPolicy: IfNotPresent
           command: ["uv"]
           args:
