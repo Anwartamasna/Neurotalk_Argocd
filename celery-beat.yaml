@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: beat
-          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:164
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:166
           command: ["uv"]
           args: ["run", "celery", "-A", "app.celery_app", "beat", "--loglevel=INFO"]
 
