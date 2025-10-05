@@ -25,7 +25,7 @@ spec:
       terminationGracePeriodSeconds: 300
       containers:
         - name: neurotalk-api
-          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:136
+          image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:137
           imagePullPolicy: IfNotPresent
           command: ["uv"]
           args:
