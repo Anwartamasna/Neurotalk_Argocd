@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: email-worker
-        image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:172
+        image: harbor.imadzajli.xyz/neurotalk-back/neurotalk-backend:179
         env:
         - name: ENV
           value: "k8s"
