@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: harbor.imadzajli.xyz/neurotalk-front/neurotalk-frontend:194
+        image: harbor.imadzajli.xyz/neurotalk-front/neurotalk-frontend:195
         ports:
         - containerPort: 80
         env:
